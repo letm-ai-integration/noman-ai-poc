@@ -26,3 +26,8 @@ SYSTEM_ROLES = {
 
 # API Configuration
 DEVICE = "cpu"  # Use "cuda" if GPU available
+
+# LM Studio Configuration
+USE_LMS = True
+LMS_API_BASE = "http://localhost:1234/v1"
+LMS_MODEL_ID = "local-model"  # Default for LMS
