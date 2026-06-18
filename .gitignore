@@ -25,6 +25,9 @@ wheels/
 .installed.cfg
 *.egg
 
+# RAG vector store
+chroma_db/
+
 # Models and Cache
 .cache/
 *.model

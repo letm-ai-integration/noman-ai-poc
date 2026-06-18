@@ -1,0 +1,10 @@
+# RAG chatbot dependencies (additive — install alongside requirements.txt)
+langchain
+langchain-community
+langchain-openai
+langchain-huggingface
+langchain-text-splitters
+chromadb
+sentence-transformers
+unstructured
+markdown

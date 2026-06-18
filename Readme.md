@@ -12,24 +12,36 @@ A pure Python implementation of an interactive QnA bot with LLM (Large Language 
 - Temperature and max_tokens experimentation
 - Conversation history management
 
-🚀 **No Heavy Frameworks:**
+📚 **RAG Chatbot (Retail Cloud Platform Docs):**
+- Conversational retrieval-augmented generation over local markdown docs
+- LangChain + Chroma vector store with persistent local index
+- History-aware follow-up questions via LM Studio
+
+🚀 **No Heavy Frameworks (core QnA bot):**
 - Pure Python implementation
-- No Langchain/Langgraph dependencies
+- No Langchain/Langgraph dependencies in the base CLI/API
 - Direct HuggingFace transformers library
 - Lightweight models (distilgpt2, sentence-transformers)
 
 ## Project Structure
 
 ```
-llm-qna-bot/
+noman-ai-poc/
 ├── src/
 │   ├── __init__.py              # Package initialization
 │   ├── main.py                  # CLI entry point
 │   ├── config.py                # Configuration settings
 │   ├── llm_client.py            # LLM generation logic
 │   ├── prompt_manager.py        # Role-based prompts
-│   └── token_visualizer.py      # Token & embedding visualization
-├── requirements.txt             # Python dependencies
+│   ├── token_visualizer.py      # Token & embedding visualization
+│   └── rag/                     # Retail Cloud Platform RAG chatbot
+│       ├── config.py            # RAG paths and chunk settings
+│       ├── loader.py            # Markdown doc loading and splitting
+│       ├── vectorstore.py       # Chroma index build/load
+│       ├── chain.py             # History-aware retrieval chain
+│       └── cli.py               # RAG interactive CLI
+├── requirements.txt             # Python dependencies (core bot)
+├── requirements_rag.txt         # Additional RAG dependencies
 ├── setup.sh                     # Setup script
 └── README.md                    # This file
 ```
@@ -39,7 +51,7 @@ llm-qna-bot/
 ### 1. Clone and Navigate to Project
 
 ```bash
-cd /Users/mohammadnoman/Projects/digital/LETM-AI/llm-qna-bot
+cd /Users/mohammadnoman/Projects/digital/LETM-AI/noman-ai-poc
 ```
 
 ### 2. Create Virtual Environment
@@ -133,6 +145,92 @@ python -m src.main --visualize-embeddings "AI is smart" "ML is powerful" "NLP is
 
 ```bash
 python -m src.main --similarity "The cat sat on the mat" "A cat was sitting on a mat"
+```
+
+## Retail Cloud Platform RAG Chatbot
+
+A separate LangChain-based module that answers questions about the Retail Cloud Platform using markdown documentation from `retail-platform/docs`. It uses LM Studio for generation, HuggingFace embeddings locally, and a persisted Chroma index.
+
+### Prerequisites
+
+1. **LM Studio** running with a model loaded and the local server enabled at `http://localhost:1234/v1`
+2. **Documentation** available at `/Users/mohammadnoman/Projects/digital/retail-platform/docs`
+
+### Install RAG Dependencies
+
+From the repo root with your virtual environment activated:
+
+```bash
+pip install -r requirements.txt -r requirements_rag.txt
+```
+
+The first run downloads the embedding model (`sentence-transformers/all-MiniLM-L6-v2`) if it is not already cached.
+
+### Run the RAG Chatbot
+
+```bash
+python -m src.rag.cli
+```
+
+On the first run, the CLI builds a Chroma index from the markdown docs (about 30 seconds) and saves it to `./chroma_db/`. Later runs load the saved index instantly.
+
+To force a rebuild after docs change:
+
+```bash
+python -m src.rag.cli --rebuild
+```
+
+### RAG CLI Commands
+
+Once started, type questions at the `You:` prompt:
+
+```
+You: What are the three repositories in the Retail Cloud Platform?
+You: How does cloud-requests dispatch to cloud-infrastructure?
+You: What known gaps exist in cross-repo integration?
+```
+
+| Command | Action |
+|---------|--------|
+| `exit` / `quit` | Exit the chatbot |
+| `clear` | Reset conversation history |
+| `sources` | Toggle source citations on/off |
+| `help` | Show help |
+
+### RAG Configuration
+
+Edit `src/rag/config.py` to customize:
+
+- `DOCS_PATH` — path to the markdown documentation directory
+- `CHROMA_PERSIST_DIR` — local vector store location (default: `./chroma_db/`)
+- `CHUNK_SIZE` / `CHUNK_OVERLAP` — document chunking settings
+- `RETRIEVER_K` — number of chunks retrieved per question
+
+LM Studio settings are reused from `src/config.py` (`LMS_API_BASE`, `LMS_MODEL_ID`).
+
+### RAG Troubleshooting
+
+**Documentation directory not found**
+
+Verify `DOCS_PATH` in `src/rag/config.py` points to your docs folder.
+
+**Connection errors to LM Studio**
+
+Open LM Studio, load a chat model, and start the local server on port `1234`.
+
+**Missing packages**
+
+```bash
+pip install -r requirements_rag.txt
+```
+
+### Quick Start (RAG)
+
+```bash
+cd /Users/mohammadnoman/Projects/digital/LETM-AI/noman-ai-poc
+source .venv/bin/activate
+pip install -r requirements.txt -r requirements_rag.txt
+python -m src.rag.cli
 ```
 
 ## Configuration
@@ -408,7 +506,7 @@ Open source - feel free to use and modify!
 - [ ] Add more LLM models (Llama, Mistral, etc.)
 - [ ] Fine-tuning on custom datasets
 - [ ] Advanced embedding visualizations (t-SNE, UMAP)
-- [ ] Multi-turn conversation with context
+- [x] Multi-turn conversation with context (RAG chatbot)
 - [ ] Performance benchmarking
 - [ ] Export conversation history
 
