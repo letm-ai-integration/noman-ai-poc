@@ -28,6 +28,9 @@ wheels/
 # RAG vector store
 chroma_db/
 
+# Agent output
+output/
+
 # Models and Cache
 .cache/
 *.model

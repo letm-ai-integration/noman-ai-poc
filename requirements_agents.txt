@@ -1,0 +1,6 @@
+# Agent dependencies (additive — install alongside requirements.txt + requirements_rag.txt)
+# Pinned to the langchain 0.3.x ecosystem to avoid pip resolution-too-deep errors.
+langgraph==0.6.11
+langchain-experimental==0.3.4
+duckduckgo-search==8.1.1
+ddgs

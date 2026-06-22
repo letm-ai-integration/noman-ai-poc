@@ -17,6 +17,11 @@ A pure Python implementation of an interactive QnA bot with LLM (Large Language 
 - LangChain + Chroma vector store with persistent local index
 - History-aware follow-up questions via LM Studio
 
+🤖 **LangChain Agents:**
+- Single-tool ReAct agent with documentation search
+- Multi-tool LangGraph agent (docs, web search, Python REPL, file writer, index stats)
+- Both agents use LM Studio as the LLM backend
+
 🚀 **No Heavy Frameworks (core QnA bot):**
 - Pure Python implementation
 - No Langchain/Langgraph dependencies in the base CLI/API
@@ -34,14 +39,19 @@ noman-ai-poc/
 │   ├── llm_client.py            # LLM generation logic
 │   ├── prompt_manager.py        # Role-based prompts
 │   ├── token_visualizer.py      # Token & embedding visualization
-│   └── rag/                     # Retail Cloud Platform RAG chatbot
-│       ├── config.py            # RAG paths and chunk settings
-│       ├── loader.py            # Markdown doc loading and splitting
-│       ├── vectorstore.py       # Chroma index build/load
-│       ├── chain.py             # History-aware retrieval chain
-│       └── cli.py               # RAG interactive CLI
+│   ├── rag/                     # Retail Cloud Platform RAG chatbot
+│   │   ├── config.py            # RAG paths and chunk settings
+│   │   ├── loader.py            # Markdown doc loading and splitting
+│   │   ├── vectorstore.py       # Chroma index build/load
+│   │   ├── chain.py             # History-aware retrieval chain
+│   │   └── cli.py               # RAG interactive CLI
+│   └── agents/                  # LangChain tool-calling agents
+│       ├── tools.py             # Shared custom tools
+│       ├── single_tool_agent.py # ReAct agent (1 tool)
+│       └── multi_tool_agent.py  # LangGraph agent (5 tools)
 ├── requirements.txt             # Python dependencies (core bot)
 ├── requirements_rag.txt         # Additional RAG dependencies
+├── requirements_agents.txt      # Additional agent dependencies
 ├── setup.sh                     # Setup script
 └── README.md                    # This file
 ```
@@ -161,6 +171,7 @@ A separate LangChain-based module that answers questions about the Retail Cloud 
 From the repo root with your virtual environment activated:
 
 ```bash
+python -m pip install --upgrade pip
 pip install -r requirements.txt -r requirements_rag.txt
 ```
 
@@ -232,6 +243,98 @@ source .venv/bin/activate
 pip install -r requirements.txt -r requirements_rag.txt
 python -m src.rag.cli
 ```
+
+## LangChain Agents
+
+Two tool-calling agents built on LangChain and LangGraph, both using LM Studio (`ChatOpenAI` at `http://localhost:1234/v1`) and the same Chroma index as the RAG module.
+
+### Prerequisites
+
+Same as the RAG chatbot: LM Studio running locally and the Retail Cloud Platform docs available at the path configured in `src/rag/config.py`.
+
+### Install Agent Dependencies
+
+Upgrade pip first (avoids `resolution-too-deep` errors on older pip):
+
+```bash
+python -m pip install --upgrade pip
+pip install -r requirements.txt -r requirements_rag.txt -r requirements_agents.txt
+```
+
+### Agent 1 — Single Tool (ReAct)
+
+Uses one custom tool, `retail_docs_tool`, which performs similarity search over the indexed markdown documentation. The agent follows a ReAct loop (Thought → Action → Observation) via `AgentExecutor`.
+
+**One-shot:**
+
+```bash
+python -m src.agents.single_tool_agent "What is the Retail Cloud Platform deployment process?"
+```
+
+**Interactive:**
+
+```bash
+python -m src.agents.single_tool_agent
+```
+
+| Flag | Description |
+|------|-------------|
+| `--rebuild` | Rebuild the Chroma index from docs |
+| `--quiet` | Disable verbose agent step logging |
+
+### Agent 2 — Multi Tool (LangGraph)
+
+Uses five tools orchestrated by LangGraph's prebuilt ReAct agent:
+
+| Tool | Type | Purpose |
+|------|------|---------|
+| `retail_docs_tool` | Custom | RAG search over Chroma index |
+| `DuckDuckGoSearchRun` | Built-in | Live web search |
+| `PythonREPLTool` | Built-in | Execute Python snippets |
+| `file_writer_tool` | Custom | Save reports to `./output/` |
+| `index_stats_tool` | Custom | Report index document/chunk counts |
+
+**One-shot:**
+
+```bash
+python -m src.agents.multi_tool_agent "Summarise the platform architecture and save a report"
+```
+
+**Interactive:**
+
+```bash
+python -m src.agents.multi_tool_agent
+```
+
+| Flag | Description |
+|------|-------------|
+| `--rebuild` | Rebuild the Chroma index from docs |
+| `--quiet` | Disable verbose tool-call logging |
+
+### Agent Troubleshooting
+
+**`resolution-too-deep` or slow pip install**
+
+Upgrade pip, then reinstall with the pinned requirement files:
+
+```bash
+python -m pip install --upgrade pip
+pip install -r requirements.txt -r requirements_rag.txt -r requirements_agents.txt
+```
+
+**Import errors for `langgraph` or `langchain_experimental`**
+
+```bash
+pip install -r requirements_agents.txt
+```
+
+**Agent cannot reach LM Studio**
+
+Ensure a chat model is loaded and the local server is running on port `1234`.
+
+**Empty documentation results**
+
+Run with `--rebuild` to re-index docs, or verify `DOCS_PATH` in `src/rag/config.py`.
 
 ## Configuration
 
