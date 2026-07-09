@@ -2,6 +2,8 @@
 
 *A guide for understanding NeMo Guardrails well enough to teach it to a team.*
 
+[DEMO HERE!!!](https://thorny-quasar-qaj2.here.now/#1)
+
 ---
 
 ## 1. The 60-Second Pitch (open your talk with this)
