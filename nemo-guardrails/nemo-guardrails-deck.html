@@ -1,0 +1,1503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NVIDIA NeMo Guardrails — Training Deck</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Orbitron:wght@500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ── Reset & Variables ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-deep: #05060a;
+      --bg-mid: #0a0e17;
+      --bg-card: rgba(10, 14, 23, 0.85);
+      --cyan: #00f0ff;
+      --magenta: #ff2fd0;
+      --amber: #ffb020;
+      --text: #c8d2e0;
+      --text-dim: #6b7a90;
+      --text-bright: #eef2f8;
+      --glow-cyan: 0 0 20px rgba(0, 240, 255, 0.35), 0 0 60px rgba(0, 240, 255, 0.12);
+      --glow-magenta: 0 0 20px rgba(255, 47, 208, 0.3);
+      --border-glow: 1px solid rgba(0, 240, 255, 0.35);
+      --font-head: 'Space Grotesk', 'Orbitron', system-ui, sans-serif;
+      --font-display: 'Orbitron', 'Space Grotesk', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', monospace;
+      --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+      --slide-pad: clamp(1.5rem, 4vw, 4rem);
+      --transition: 300ms var(--ease);
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg-deep);
+      color: var(--text);
+      font-family: var(--font-head);
+      font-size: clamp(14px, 1.1vw, 18px);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Console Motifs ── */
+    .grid-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background-image:
+        linear-gradient(rgba(0, 240, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 240, 255, 0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(ellipse 80% 70% at 50% 50%, black 20%, transparent 75%);
+    }
+
+    .scanline {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9998;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.03) 2px,
+        rgba(0, 0, 0, 0.03) 4px
+      );
+      opacity: 0.4;
+    }
+
+    .scanline::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.08), transparent);
+      animation: scanMove 8s linear infinite;
+    }
+
+    @keyframes scanMove {
+      0% { top: -3px; }
+      100% { top: 100%; }
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: var(--glow-cyan); }
+      50% { box-shadow: 0 0 28px rgba(0, 240, 255, 0.5), 0 0 80px rgba(0, 240, 255, 0.18); }
+    }
+
+    @keyframes caretBlink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+
+    /* ── Deck Container ── */
+    .deck {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+      background:
+        radial-gradient(ellipse 60% 50% at 20% 20%, rgba(0, 240, 255, 0.04) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 80% 80%, rgba(255, 47, 208, 0.03) 0%, transparent 55%),
+        linear-gradient(180deg, var(--bg-deep) 0%, var(--bg-mid) 50%, var(--bg-deep) 100%);
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: var(--slide-pad);
+      padding-top: calc(var(--slide-pad) + 1rem);
+      padding-bottom: calc(var(--slide-pad) + 3rem);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(12px);
+      transition: opacity var(--transition), transform var(--transition), visibility var(--transition);
+      overflow-y: auto;
+    }
+
+    .slide.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+      z-index: 2;
+    }
+
+    .slide-inner {
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    /* ── Typography ── */
+    .slide-label {
+      font-family: var(--font-mono);
+      font-size: clamp(0.65rem, 0.9vw, 0.75rem);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--cyan);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .slide-label::before {
+      content: '//';
+      color: var(--text-dim);
+    }
+
+    h1, h2, h3 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      color: var(--text-bright);
+      line-height: 1.15;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      letter-spacing: 0.02em;
+    }
+
+    h2 {
+      font-size: clamp(1.5rem, 3.2vw, 2.25rem);
+      margin-bottom: clamp(1rem, 2vw, 1.75rem);
+    }
+
+    h3 {
+      font-size: clamp(0.95rem, 1.4vw, 1.15rem);
+      color: var(--cyan);
+      font-family: var(--font-mono);
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+
+    p, li { color: var(--text); }
+
+    .subtitle {
+      font-size: clamp(1rem, 1.8vw, 1.35rem);
+      color: var(--text-dim);
+      margin-top: 0.75rem;
+      font-weight: 400;
+    }
+
+    .lead {
+      font-size: clamp(1rem, 1.5vw, 1.2rem);
+      color: var(--text);
+      max-width: 52ch;
+      margin-bottom: 1.5rem;
+      border-left: 2px solid var(--cyan);
+      padding-left: 1rem;
+    }
+
+    /* ── Bracket Ornament ── */
+    .bracket-box {
+      position: relative;
+      padding: clamp(1.5rem, 3vw, 2.5rem);
+    }
+
+    .bracket-box::before,
+    .bracket-box::after {
+      content: '';
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border-color: var(--cyan);
+      border-style: solid;
+      opacity: 0.6;
+    }
+
+    .bracket-box::before {
+      top: 0; left: 0;
+      border-width: 2px 0 0 2px;
+    }
+
+    .bracket-box::after {
+      bottom: 0; right: 0;
+      border-width: 0 2px 2px 0;
+    }
+
+    .glow-behind {
+      position: relative;
+    }
+
+    .glow-behind::before {
+      content: '';
+      position: absolute;
+      inset: -20%;
+      background: radial-gradient(ellipse at center, rgba(0, 240, 255, 0.08) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    /* ── Cards ── */
+    .card-grid {
+      display: grid;
+      gap: clamp(0.75rem, 1.5vw, 1.25rem);
+    }
+
+    .card-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+    .card-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+    .card-grid.cols-5 { grid-template-columns: repeat(5, 1fr); }
+    .card-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+
+    .card {
+      background: var(--bg-card);
+      border: var(--border-glow);
+      border-radius: 4px;
+      padding: clamp(0.85rem, 1.5vw, 1.25rem);
+      backdrop-filter: blur(8px);
+      transition: box-shadow var(--transition), border-color var(--transition);
+    }
+
+    .card:hover {
+      border-color: rgba(0, 240, 255, 0.55);
+      box-shadow: var(--glow-cyan);
+    }
+
+    .card-icon {
+      margin-bottom: 0.5rem;
+      line-height: 1;
+      color: var(--cyan);
+    }
+
+    .card.magenta .card-icon { color: var(--magenta); }
+    .card.amber .card-icon { color: var(--amber); }
+
+    .svg-icon {
+      display: block;
+      width: 24px;
+      height: 24px;
+      stroke: currentColor;
+      stroke-width: 1.5;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .card-when {
+      font-family: var(--font-mono);
+      font-size: clamp(0.65rem, 0.85vw, 0.72rem);
+      color: var(--cyan);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 0.35rem;
+    }
+
+    .card.magenta .card-when { color: var(--magenta); }
+    .card.amber .card-when { color: var(--amber); }
+
+    .caption {
+      margin-top: 0.5rem;
+      font-family: var(--font-mono);
+      font-size: clamp(0.68rem, 0.85vw, 0.78rem);
+      color: var(--text-dim);
+      letter-spacing: 0.02em;
+    }
+
+    .panel-desc {
+      font-size: clamp(0.78rem, 1vw, 0.88rem);
+      color: var(--text-dim);
+      margin-bottom: 0.65rem;
+      line-height: 1.4;
+    }
+
+    .pipeline-note {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .pipeline-note .svg-icon {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      color: var(--amber);
+    }
+
+    .closing-subline {
+      text-align: center;
+      margin-top: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: clamp(0.68rem, 0.9vw, 0.78rem);
+      color: var(--text-dim);
+      letter-spacing: 0.04em;
+    }
+
+    .card-title {
+      font-family: var(--font-mono);
+      font-size: clamp(0.75rem, 1vw, 0.85rem);
+      font-weight: 600;
+      color: var(--cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.4rem;
+    }
+
+    .card-body {
+      font-size: clamp(0.8rem, 1vw, 0.9rem);
+      color: var(--text-dim);
+      line-height: 1.45;
+    }
+
+    .card-body strong { color: var(--text); font-weight: 500; }
+
+    .card.magenta { border-color: rgba(255, 47, 208, 0.35); }
+    .card.magenta .card-title { color: var(--magenta); }
+    .card.amber { border-color: rgba(255, 176, 32, 0.35); }
+    .card.amber .card-title { color: var(--amber); }
+
+    /* ── Code Blocks ── */
+    .terminal {
+      background: rgba(5, 6, 10, 0.92);
+      border: var(--border-glow);
+      border-radius: 6px;
+      overflow: hidden;
+      font-family: var(--font-mono);
+      font-size: clamp(0.7rem, 0.95vw, 0.82rem);
+      line-height: 1.6;
+    }
+
+    .terminal-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0.5rem 0.85rem;
+      background: rgba(0, 240, 255, 0.06);
+      border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+    }
+
+    .terminal-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      opacity: 0.5;
+    }
+
+    .terminal-dot:nth-child(1) { background: #ff5f57; opacity: 0.8; }
+    .terminal-dot:nth-child(2) { background: #febc2e; opacity: 0.8; }
+    .terminal-dot:nth-child(3) { background: #28c840; opacity: 0.8; }
+
+    .terminal-title {
+      margin-left: 0.5rem;
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      letter-spacing: 0.05em;
+    }
+
+    .terminal-body {
+      padding: clamp(0.75rem, 1.5vw, 1.25rem);
+      overflow-x: auto;
+      white-space: pre;
+      color: #a8b8cc;
+    }
+
+    .terminal-body .prompt { color: var(--cyan); }
+    .terminal-body .kw { color: var(--magenta); }
+    .terminal-body .str { color: #7dd3a0; }
+    .terminal-body .cmt { color: var(--text-dim); font-style: italic; }
+    .terminal-body .key { color: var(--amber); }
+
+    /* ── Split Layout ── */
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(1rem, 2vw, 1.75rem);
+      align-items: start;
+    }
+
+    .callout-list {
+      list-style: none;
+      margin-top: 1rem;
+    }
+
+    .callout-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+      margin-bottom: 0.6rem;
+      font-size: clamp(0.85rem, 1.1vw, 0.95rem);
+    }
+
+    .callout-list li::before {
+      content: '▸';
+      color: var(--cyan);
+      flex-shrink: 0;
+      font-family: var(--font-mono);
+    }
+
+    /* ── Pipeline SVG ── */
+    .pipeline-wrap {
+      width: 100%;
+      overflow-x: auto;
+      padding: 1rem 0;
+    }
+
+    .pipeline-svg {
+      width: 100%;
+      min-width: 700px;
+      height: auto;
+      display: block;
+    }
+
+    .pipeline-note {
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: clamp(0.7rem, 0.9vw, 0.8rem);
+      color: var(--amber);
+      margin-top: 0.75rem;
+      letter-spacing: 0.03em;
+    }
+
+    /* ── Slide 1: Title ── */
+    .title-slide {
+      text-align: center;
+      align-items: center;
+    }
+
+    .title-slide .slide-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .title-slide h1 {
+      background: linear-gradient(135deg, var(--text-bright) 0%, var(--cyan) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .title-badge {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: clamp(0.65rem, 0.85vw, 0.75rem);
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--cyan);
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      padding: 0.35rem 1rem;
+      margin-bottom: 1.5rem;
+      border-radius: 2px;
+    }
+
+    .presented-by {
+      margin-top: 1.25rem;
+      font-family: var(--font-mono);
+      font-size: clamp(0.7rem, 0.95vw, 0.82rem);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    .presented-by span {
+      color: var(--cyan);
+      font-weight: 500;
+    }
+
+      font-family: var(--font-mono);
+      font-size: clamp(0.65rem, 0.85vw, 0.75rem);
+      color: var(--text-dim);
+      letter-spacing: 0.05em;
+    }
+
+    .nav-hint kbd {
+      display: inline-block;
+      padding: 0.15rem 0.4rem;
+      border: 1px solid rgba(0, 240, 255, 0.25);
+      border-radius: 3px;
+      color: var(--cyan);
+      font-family: inherit;
+      margin: 0 0.1rem;
+    }
+
+    .caret {
+      display: inline-block;
+      width: 2px;
+      height: 1em;
+      background: var(--cyan);
+      margin-left: 4px;
+      vertical-align: text-bottom;
+      animation: caretBlink 1s step-end infinite;
+    }
+
+    /* ── Slide 12: Closing ── */
+    .closing-cta {
+      text-align: center;
+      margin-top: 2rem;
+      font-family: var(--font-display);
+      font-size: clamp(1.25rem, 2.5vw, 1.75rem);
+      color: var(--cyan);
+      text-shadow: var(--glow-cyan);
+      letter-spacing: 0.1em;
+    }
+
+    .resource-link {
+      color: var(--cyan);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(0, 240, 255, 0.3);
+      transition: border-color var(--transition);
+    }
+
+    .resource-link:hover,
+    .resource-link:focus-visible {
+      border-color: var(--cyan);
+    }
+
+    .footer-note {
+      margin-top: 1rem;
+      font-family: var(--font-mono);
+      font-size: clamp(0.7rem, 0.9vw, 0.8rem);
+      color: var(--text-dim);
+      text-align: center;
+      padding: 0.5rem;
+      border-top: 1px solid rgba(0, 240, 255, 0.1);
+    }
+
+    /* ── Progress & Counter ── */
+    .progress-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--cyan), var(--magenta));
+      z-index: 100;
+      transition: width var(--transition);
+      box-shadow: 0 0 12px rgba(0, 240, 255, 0.5);
+    }
+
+    .counter {
+      position: fixed;
+      bottom: 1.25rem;
+      left: 1.5rem;
+      font-family: var(--font-mono);
+      font-size: clamp(0.75rem, 1vw, 0.85rem);
+      color: var(--text-dim);
+      z-index: 100;
+      letter-spacing: 0.1em;
+    }
+
+    .counter .current {
+      color: var(--cyan);
+      font-weight: 600;
+    }
+
+    /* ── Nav Buttons ── */
+    .nav-controls {
+      position: fixed;
+      bottom: 1.25rem;
+      right: 1.5rem;
+      display: flex;
+      gap: 0.5rem;
+      z-index: 100;
+    }
+
+    .nav-btn {
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(10, 14, 23, 0.9);
+      border: var(--border-glow);
+      border-radius: 4px;
+      color: var(--cyan);
+      cursor: pointer;
+      font-size: 1.1rem;
+      transition: background var(--transition), box-shadow var(--transition), border-color var(--transition);
+      backdrop-filter: blur(8px);
+    }
+
+    .nav-btn:hover {
+      background: rgba(0, 240, 255, 0.08);
+      box-shadow: var(--glow-cyan);
+    }
+
+    .nav-btn:focus-visible {
+      outline: 2px solid var(--cyan);
+      outline-offset: 2px;
+    }
+
+    .nav-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .nav-btn:disabled:hover {
+      background: rgba(10, 14, 23, 0.9);
+      box-shadow: none;
+    }
+
+    /* ── Overview Grid ── */
+    .overview {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(5, 6, 10, 0.95);
+      backdrop-filter: blur(12px);
+      display: none;
+      flex-direction: column;
+      padding: 2rem;
+      overflow-y: auto;
+    }
+
+    .overview.open {
+      display: flex;
+    }
+
+    .overview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      flex-shrink: 0;
+    }
+
+    .overview-header h2 {
+      font-size: 1.25rem;
+      margin: 0;
+    }
+
+    .overview-close {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      letter-spacing: 0.1em;
+    }
+
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1rem;
+      flex: 1;
+    }
+
+    .overview-tile {
+      position: relative;
+      aspect-ratio: 16 / 10;
+      background: var(--bg-card);
+      border: 1px solid rgba(0, 240, 255, 0.2);
+      border-radius: 4px;
+      cursor: pointer;
+      overflow: hidden;
+      transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+      padding: 0;
+      text-align: left;
+      color: inherit;
+      font: inherit;
+    }
+
+    .overview-tile:hover,
+    .overview-tile:focus-visible {
+      border-color: var(--cyan);
+      box-shadow: var(--glow-cyan);
+      transform: scale(1.02);
+    }
+
+    .overview-tile:focus-visible {
+      outline: 2px solid var(--cyan);
+      outline-offset: 2px;
+    }
+
+    .overview-tile.current {
+      border-color: var(--cyan);
+      animation: pulseGlow 2s ease-in-out infinite;
+    }
+
+    .overview-tile-num {
+      position: absolute;
+      top: 0.5rem;
+      left: 0.6rem;
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: var(--cyan);
+      letter-spacing: 0.1em;
+    }
+
+    .overview-tile-title {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 0.6rem 0.75rem;
+      background: linear-gradient(transparent, rgba(5, 6, 10, 0.95));
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text);
+      letter-spacing: 0.03em;
+      line-height: 1.3;
+    }
+
+    /* ── Live Region (screen reader) ── */
+    .sr-live {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 1024px) {
+      .card-grid.cols-5 { grid-template-columns: repeat(3, 1fr); }
+      .card-grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 768px) {
+      .split { grid-template-columns: 1fr; }
+      .card-grid.cols-3,
+      .card-grid.cols-5 { grid-template-columns: 1fr; }
+      .card-grid.cols-4 { grid-template-columns: 1fr; }
+      .nav-controls { bottom: 0.75rem; right: 0.75rem; }
+      .counter { bottom: 0.75rem; left: 0.75rem; }
+    }
+
+    @media (max-width: 480px) {
+      .overview-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ── Reduced Motion ── */
+    @media (prefers-reduced-motion: reduce) {
+      .slide { transition: opacity var(--transition), visibility var(--transition); transform: none !important; }
+      .slide.active { transform: none; }
+      .scanline::after { animation: none; display: none; }
+      .overview-tile.current { animation: none; }
+      .caret { animation: none; opacity: 1; }
+      .overview-tile:hover { transform: none; }
+    }
+
+    /* Hide chrome in overview */
+    body.overview-mode .progress-bar,
+    body.overview-mode .counter,
+    body.overview-mode .nav-controls {
+      opacity: 0;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="grid-overlay" aria-hidden="true"></div>
+  <div class="scanline" aria-hidden="true"></div>
+
+  <div class="progress-bar" id="progressBar" role="progressbar" aria-valuemin="1" aria-valuemax="12" aria-valuenow="1"></div>
+  <div class="counter" aria-hidden="true"><span class="current" id="counterCurrent">01</span> / <span id="counterTotal">12</span></div>
+
+  <nav class="nav-controls" aria-label="Slide navigation">
+    <button class="nav-btn" id="btnPrev" aria-label="Previous slide">&#8592;</button>
+    <button class="nav-btn" id="btnNext" aria-label="Next slide">&#8594;</button>
+  </nav>
+
+  <div class="sr-live" aria-live="polite" aria-atomic="true" id="liveRegion"></div>
+
+  <main class="deck" id="deck">
+
+    <!-- Slide 1: Title -->
+    <section class="slide title-slide active" data-title="Title" aria-label="Slide 1: Title" role="group">
+      <div class="slide-inner bracket-box glow-behind">
+        <span class="title-badge">Internal Training Deck</span>
+        <h1>NVIDIA NeMo Guardrails</h1>
+        <p class="subtitle">Programmable safety, control, and grounding for LLM apps.<span class="caret" aria-hidden="true"></span></p>
+        <p class="presented-by">Presented by <span>Mohammad Noman</span></p>
+        <p class="nav-hint">
+          <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> <kbd>Space</kbd> to navigate &nbsp;·&nbsp; press <kbd>.</kbd> for overview
+        </p>
+      </div>
+    </section>
+
+    <!-- Slide 2: Why Guardrails -->
+    <section class="slide" data-title="Why Guardrails" aria-label="Slide 2: Why Guardrails" role="group">
+      <div class="slide-inner">
+        <div class="slide-label">Section 01</div>
+        <h2>Why Guardrails</h2>
+        <p class="lead">A raw LLM call has one hop. Anything that goes wrong has to be caught by prompt wording alone.</p>
+        <p style="margin-bottom:1.25rem;color:var(--text-dim);font-size:clamp(0.9rem,1.2vw,1rem);">
+          Guardrails wraps that hop in a programmable pipeline. Policies live in config; the runtime enforces them deterministically.
+        </p>
+        <div class="card-grid cols-3">
+          <div class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 2L4 6v6c0 5 3.5 9.5 8 10 4.5-.5 8-5 8-10V6l-8-4z"/></svg>
+            </div>
+            <div class="card-title">Safety</div>
+            <div class="card-body">Block jailbreaks inbound. Filter toxic, hallucinated, or PII-leaking output.</div>
+          </div>
+          <div class="card magenta">
+            <div class="card-icon" aria-hidden="true">
+              <svg class="svg-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><circle cx="12" cy="12" r="2"/></svg>
+            </div>
+            <div class="card-title">Control</div>
+            <div class="card-body">Explicit dialog flows keep the assistant on-topic. No system-prompt roulette.</div>
+          </div>
+          <div class="card amber">
+            <div class="card-icon" aria-hidden="true">
+              <svg class="svg-icon" viewBox="0 0 24 24"><rect x="4" y="14" width="16" height="4" rx="1"/><rect x="6" y="9" width="12" height="4" rx="1"/><rect x="8" y="4" width="8" height="4" rx="1"/></svg>
+            </div>
+            <div class="card-title">Grounding &amp; Actions</div>
+            <div class="card-body">Vet RAG chunks before they reach the prompt. Gate every tool the model can call.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 3: Event-Driven Architecture -->
+    <section class="slide" data-title="Event-Driven Architecture" aria-label="Slide 3: Event-Driven Architecture" role="group">
+      <div class="slide-inner">
+        <div class="slide-label">Section 02</div>
+        <h2>Event-Driven Architecture</h2>
+        <p class="lead">The runtime doesn't read text. It reasons over a structured event stream.</p>
+        <div class="card-grid cols-3">
+          <div class="card">
+            <div class="card-title">Events</div>
+            <div class="card-body">Things that happen — user messages, bot responses, guardrail triggers.</div>
+            <div class="terminal" style="margin-top:0.75rem;">
+              <div class="terminal-body" style="padding:0.6rem 0.75rem;font-size:0.7rem;">UtteranceUserActionFinished
+StartUtteranceBotAction</div>
+            </div>
+          </div>
+          <div class="card magenta">
+            <div class="card-title">Actions</div>
+            <div class="card-body">Units of work that produce events — LLM calls, Python functions, tool invocations.</div>
+            <div class="terminal" style="margin-top:0.75rem;">
+              <div class="terminal-body" style="padding:0.6rem 0.75rem;font-size:0.7rem;">execute get_weather(...)
+generate_bot_reply(...)</div>
+            </div>
+          </div>
+          <div class="card amber">
+            <div class="card-title">Flows</div>
+            <div class="card-body">Scripts of expected events and actions — your deterministic behavior rules.</div>
+            <div class="terminal" style="margin-top:0.75rem;">
+              <div class="terminal-body" style="padding:0.6rem 0.75rem;font-size:0.7rem;">user ask medical advice
+  bot refuse medical advice</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 4: The Pipeline -->
+    <section class="slide" data-title="The Pipeline" aria-label="Slide 4: The Pipeline" role="group">
+      <div class="slide-inner">
+        <div class="slide-label">Section 02 · Rails</div>
+        <h2>The Pipeline</h2>
+        <p class="lead" style="margin-bottom:1rem;">Every user turn passes through up to five checkpoints. Each rail decides: reject, alter, or allow.</p>
+        <div class="pipeline-wrap">
+          <svg class="pipeline-svg" viewBox="0 0 900 160" xmlns="http://www.w3.org/2000/svg" aria-label="Guardrails pipeline diagram" role="img">
+            <defs>
+              <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+                <polygon points="0 0, 8 3, 0 6" fill="#00f0ff" opacity="0.7"/>
+              </marker>
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="2" result="blur"/>
+                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+            </defs>
+            <!-- User -->
+            <rect x="10" y="55" width="70" height="50" rx="4" fill="#0a0e17" stroke="#6b7a90" stroke-width="1"/>
+            <text x="45" y="85" text-anchor="middle" fill="#c8d2e0" font-family="JetBrains Mono, monospace" font-size="11">User</text>
+            <!-- Input Rail -->
+            <rect x="100" y="55" width="90" height="50" rx="4" fill="#0a0e17" stroke="#00f0ff" stroke-width="1.5" filter="url(#glow)"/>
+            <text x="145" y="78" text-anchor="middle" fill="#00f0ff" font-family="JetBrains Mono, monospace" font-size="10" font-weight="600">Input</text>
+            <text x="145" y="93" text-anchor="middle" fill="#6b7a90" font-family="JetBrains Mono, monospace" font-size="8">Rail</text>
+            <!-- Dialog Rail -->
+            <rect x="210" y="55" width="90" height="50" rx="4" fill="#0a0e17" stroke="#00f0ff" stroke-width="1.5" filter="url(#glow)"/>
+            <text x="255" y="78" text-anchor="middle" fill="#00f0ff" font-family="JetBrains Mono, monospace" font-size="10" font-weight="600">Dialog</text>
+            <text x="255" y="93" text-anchor="middle" fill="#6b7a90" font-family="JetBrains Mono, monospace" font-size="8">Rail</text>
+            <!-- Retrieval (optional) -->
+            <rect x="320" y="30" width="90" height="50" rx="4" fill="#0a0e17" stroke="#ff2fd0" stroke-width="1" stroke-dasharray="4 2"/>
+            <text x="365" y="53" text-anchor="middle" fill="#ff2fd0" font-family="JetBrains Mono, monospace" font-size="10">Retrieval</text>
+            <text x="365" y="68" text-anchor="middle" fill="#6b7a90" font-family="JetBrains Mono, monospace" font-size="8">(RAG)</text>
+            <!-- Execution (optional) -->
+            <rect x="320" y="90" width="90" height="50" rx="4" fill="#0a0e17" stroke="#ff2fd0" stroke-width="1" stroke-dasharray="4 2"/>
+            <text x="365" y="113" text-anchor="middle" fill="#ff2fd0" font-family="JetBrains Mono, monospace" font-size="10">Execution</text>
+            <text x="365" y="128" text-anchor="middle" fill="#6b7a90" font-family="JetBrains Mono, monospace" font-size="8">(Actions)</text>
+            <!-- LLM -->
+            <rect x="430" y="55" width="80" height="50" rx="4" fill="#0a0e17" stroke="#ffb020" stroke-width="1.5"/>
+            <text x="470" y="85" text-anchor="middle" fill="#ffb020" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600">LLM</text>
+            <!-- Output Rail -->
+            <rect x="530" y="55" width="90" height="50" rx="4" fill="#0a0e17" stroke="#00f0ff" stroke-width="1.5" filter="url(#glow)"/>
+            <text x="575" y="78" text-anchor="middle" fill="#00f0ff" font-family="JetBrains Mono, monospace" font-size="10" font-weight="600">Output</text>
+            <text x="575" y="93" text-anchor="middle" fill="#6b7a90" font-family="JetBrains Mono, monospace" font-size="8">Rail</text>
+            <!-- User out -->
+            <rect x="640" y="55" width="70" height="50" rx="4" fill="#0a0e17" stroke="#6b7a90" stroke-width="1"/>
+            <text x="675" y="85" text-anchor="middle" fill="#c8d2e0" font-family="JetBrains Mono, monospace" font-size="11">User</text>
+            <!-- Arrows -->
+            <line x1="80" y1="80" x2="98" y2="80" stroke="#00f0ff" stroke-width="1.5" marker-end="url(#arrowhead)" opacity="0.7"/>
+            <line x1="190" y1="80" x2="208" y2="80" stroke="#00f0ff" stroke-width="1.5" marker-end="url(#arrowhead)" opacity="0.7"/>
+            <line x1="300" y1="80" x2="428" y2="80" stroke="#00f0ff" stroke-width="1.5" marker-end="url(#arrowhead)" opacity="0.7"/>
+            <line x1="510" y1="80" x2="528" y2="80" stroke="#00f0ff" stroke-width="1.5" marker-end="url(#arrowhead)" opacity="0.7"/>
+            <line x1="620" y1="80" x2="638" y2="80" stroke="#00f0ff" stroke-width="1.5" marker-end="url(#arrowhead)" opacity="0.7"/>
+            <!-- Dashed connectors to optional rails -->
+            <line x1="365" y1="80" x2="365" y2="88" stroke="#ff2fd0" stroke-width="1" stroke-dasharray="3 2" opacity="0.5"/>
+            <line x1="365" y1="55" x2="365" y2="72" stroke="#ff2fd0" stroke-width="1" stroke-dasharray="3 2" opacity="0.5"/>
+          </svg>
+        </div>
+        <p class="pipeline-note">
+          <svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3L2 20h20L12 3z"/><line x1="12" y1="10" x2="12" y2="14"/><circle cx="12" cy="17" r="0.5" fill="currentColor"/></svg>
+          <span>COST · each rail = +1 model call · input + output self-check triples round-trips per turn</span>
+        </p>
+      </div>
+    </section>
+
+    <!-- Slide 5: Install & Project Layout -->
+    <section class="slide" data-title="Install & Project Layout" aria-label="Slide 5: Install and Project Layout" role="group">
+      <div class="slide-inner">
+        <div class="slide-label">Section 03</div>
+        <h2>Install &amp; Project Layout</h2>
+        <p class="lead">Install with pip. Configure a folder. Run.</p>
+        <div class="split">
+          <div>
+            <div class="terminal">
+              <div class="terminal-header">
+                <span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span>
+                <span class="terminal-title">bash — install</span>
+              </div>
+              <div class="terminal-body"><span class="prompt">$ </span>python3 -m venv venv
+<span class="prompt">$ </span>source venv/bin/activate
+<span class="prompt">$ </span>pip install nemoguardrails</div>
+            </div>
+            <p class="caption">Python 3.10–3.13 · No GPU needed for the library itself.</p>
+            <div class="terminal" style="margin-top:1rem;">
+              <div class="terminal-header">
+                <span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span>
+                <span class="terminal-title">python — quickstart</span>
+              </div>
+              <div class="terminal-body"><span class="kw">from</span> nemoguardrails <span class="kw">import</span> LLMRails, RailsConfig
+config = RailsConfig.from_path(<span class="str">"./config"</span>)
+rails = LLMRails(config)
+response = rails.generate(messages=[{<span class="str">"role"</span>: <span class="str">"user"</span>, <span class="str">"content"</span>: <span class="str">"Hello!"</span>}])</div>
+            </div>
+          </div>
+          <div>
+            <h3>config/ folder</h3>
+            <div class="terminal">
+              <div class="terminal-header">
+                <span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span>
+                <span class="terminal-title">tree config/</span>
+              </div>
+              <div class="terminal-body">config/
+├── <span class="key">config.yml</span>       <span class="cmt"># models, rails, settings</span>
+├── prompts.yml       <span class="cmt"># optional prompt overrides</span>
+├── actions.py        <span class="cmt"># custom Python actions</span>
+├── config.py         <span class="cmt"># optional init code</span>
+├── rails/
+│   ├── greeting.co
+│   ├── topics.co
+│   └── ...
+└── kb/               <span class="cmt"># optional RAG docs</span></div>
+            </div>
+            <div class="terminal" style="margin-top:1rem;">
+              <div class="terminal-header">
+                <span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span>
+                <span class="terminal-title">bash — CLI</span>
+              </div>
+              <div class="terminal-body"><span class="prompt">$ </span>nemoguardrails chat --config ./config --verbose
+<span class="prompt">$ </span>nemoguardrails server --config ./config --port 8000</div>
+            </div>
+            <p class="caption"><code style="font-family:var(--font-mono);color:var(--cyan);">--verbose</code> makes the invisible pipeline visible during demos.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 6: config.yml -->
+    <section class="slide" data-title="config.yml — The Control Panel" aria-label="Slide 6: config.yml The Control Panel" role="group">
+      <div class="slide-inner">
+        <div class="slide-label">Section 04</div>
+        <h2>config.yml — The Control Panel</h2>
+        <p class="lead">One YAML file. Declares models, wires rails, tunes built-ins.</p>
+        <div class="split">
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span>
+              <span class="terminal-title">config/config.yml</span>
+            </div>
+            <div class="terminal-body"><span class="key">models</span>:
+  - <span class="key">type</span>: main
+    <span class="key">engine</span>: openai
+    <span class="key">model</span>: gpt-4o-mini
+  - <span class="key">type</span>: self_check_input
+    <span class="key">engine</span>: openai
+    <span class="key">model</span>: gpt-4o-mini
+
+<span class="key">rails</span>:
+  <span class="key">input</span>:
+    <span class="key">flows</span>:
+      - self check input
+      - mask sensitive data on input
+  <span class="key">output</span>:
+    <span class="key">flows</span>:
+      - self check output
+      - self check facts
+  <span class="key">dialog</span>:
+    <span class="key">single_call</span>:
+      <span class="key">enabled</span>: true</div>
+          </div>
+          <div>
+            <ul class="callout-list">
+              <li><span><strong style="color:var(--cyan);">models</strong> — fast model for rails, stronger model for conversation.</span></li>
+              <li><span><strong style="color:var(--cyan);">rails.input / output / dialog</strong> — wire named flows into each stage.</span></li>
+              <li><span><strong style="color:var(--cyan);">prompts</strong> — override built-in templates like <code style="font-family:var(--font-mono);color:var(--magenta);">self_check_input</code>.</span></li>
+              <li><span><strong style="color:var(--cyan);">rails.config</strong> — tune built-in rails: PII types, thresholds, etc.</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 7: Colang Two Versions -->
+    <section class="slide" data-title="Colang: Two Versions" aria-label="Slide 7: Colang Two Versions" role="group">
+      <div class="slide-inner">
+        <div class="slide-label">Section 05</div>
+        <h2>Colang: Two Versions</h2>
+        <p class="lead">One language. Two generations. Not interchangeable.</p>
+        <div class="split">
+          <div>
+            <h3>Colang 1.0</h3>
+            <p class="panel-desc">Pattern-matched intents map to fixed bot lines. Stable, mature, production default.</p>
+            <div class="terminal">
+              <div class="terminal-header">
+                <span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span>
+                <span class="terminal-title">rails/topics.co</span>
+              </div>
+              <div class="terminal-body"><span class="kw">define user</span> ask about competitors
+  <span class="str">"What do you think of [Competitor]?"</span>
+
+<span class="kw">define bot</span> refuse to discuss competitors
+  <span class="str">"I'm not able to discuss competitors."</span>
+
+<span class="kw">define flow</span>
+  user ask about competitors
+  bot refuse to discuss competitors</div>
+            </div>
+          </div>
+          <div>
+            <h3>Colang 2.0</h3>
+            <p class="panel-desc">Explicit flows. Async actions. Python-like syntax. Beta — watch for parity gaps.</p>
+            <div class="terminal">
+              <div class="terminal-header">
+                <span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span>
+                <span class="terminal-title">main.co</span>
+              </div>
+              <div class="terminal-body"><span class="kw">import</span> core, llm, guardrails
+
+<span class="kw">flow main</span>
+  activate llm continuation
+  activate greeting
+
+<span class="kw">flow greeting</span>
+  user expressed greeting
+  bot express greeting
+
+<span class="kw">flow bot express greeting</span>
+  bot say <span class="str">"Hello! I'm your assistant."</span></div>
+            </div>
+          </div>
+        </div>
+        <p class="footer-note">Label every snippet with its Colang version. The syntaxes diverge.</p>
+      </div>
+    </section>
+
+    <!-- Slide 8: Five Rail Types -->
+    <section class="slide" data-title="The Five Rail Types" aria-label="Slide 8: The Five Rail Types" role="group">
+      <div class="slide-inner">
+        <div class="slide-label">Section 06</div>
+        <h2>The Five Rail Types</h2>
+        <p class="lead">One shape, five stages. Every rail decides: reject, alter, or allow.</p>
+        <div class="card-grid cols-5">
+          <div class="card">
+            <div class="card-title">Input</div>
+            <div class="card-when">When · user message arrives</div>
+            <div class="card-body">Reject or alter inbound text — mask PII, rephrase.</div>
+          </div>
+          <div class="card magenta">
+            <div class="card-title">Dialog</div>
+            <div class="card-when">When · deciding how to respond</div>
+            <div class="card-body">Route to action, free LLM generation, or fixed response.</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Retrieval</div>
+            <div class="card-when">When · RAG chunks fetched</div>
+            <div class="card-body">Reject or mask chunks before they reach the prompt.</div>
+          </div>
+          <div class="card amber">
+            <div class="card-title">Execution</div>
+            <div class="card-when">When · custom action invoked</div>
+            <div class="card-body">Validate and sanitize tool input and output.</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Output</div>
+            <div class="card-when">When · bot message ready</div>
+            <div class="card-body">Reject or alter outbound text — toxicity, hallucination, PII.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 9: Custom Actions -->
+    <section class="slide" data-title="Custom Actions" aria-label="Slide 9: Custom Actions" role="group">
+      <div class="slide-inner">
+        <div class="slide-label">Section 07</div>
+        <h2>Custom Actions</h2>
+        <p class="lead">Actions are how Colang calls real code — a DB lookup, an API, a LangChain tool.</p>
+        <div class="split">
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span>
+              <span class="terminal-title">config/actions.py</span>
+            </div>
+            <div class="terminal-body"><span class="kw">from</span> nemoguardrails.actions <span class="kw">import</span> action
+
+@action(name=<span class="str">"validate_user_input"</span>)
+<span class="kw">async def</span> check_input(text: str):
+    <span class="kw">return</span> len(text) &gt; 0
+
+@action(execute_async=<span class="kw">True</span>)
+<span class="kw">async def</span> call_external_api(endpoint: str):
+    response = <span class="kw">await</span> http_client.get(endpoint)
+    <span class="kw">return</span> response.json()</div>
+          </div>
+          <div>
+            <h3>Call from Colang</h3>
+            <div class="terminal">
+              <div class="terminal-header">
+                <span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span>
+                <span class="terminal-title">rails/weather.co</span>
+              </div>
+              <div class="terminal-body">$is_valid = execute validate_user_input(text=$user_message)
+
+$weather = execute get_weather(city=$city_name)
+bot provide weather info</div>
+            </div>
+            <ul class="callout-list" style="margin-top:1rem;">
+              <li><span>Auto-injected: <code style="font-family:var(--font-mono);color:var(--magenta);">context</code>, <code style="font-family:var(--font-mono);color:var(--magenta);">llm</code>, <code style="font-family:var(--font-mono);color:var(--magenta);">config</code>, <code style="font-family:var(--font-mono);color:var(--magenta);">events</code></span></li>
+              <li><span>LangChain tools via <code style="font-family:var(--font-mono);color:var(--magenta);">rails.register_action()</code></span></li>
+              <li><span>Scale out with a separate actions server</span></li>
+            </ul>
+          </div>
+        </div>
+        <p class="footer-note">Drop actions.py in your config folder. Auto-registered on load.</p>
+      </div>
+    </section>
+
+    <!-- Slide 10: Built-In Safety -->
+    <section class="slide" data-title="Built-In Safety Integrations" aria-label="Slide 10: Built-In Safety Integrations" role="group">
+      <div class="slide-inner">
+        <div class="slide-label">Section 08</div>
+        <h2>Built-In Safety Integrations</h2>
+        <p class="lead">Don't roll your own detectors. Pick from the shelf.</p>
+        <div class="card-grid cols-4">
+          <div class="card">
+            <div class="card-title">Content Safety</div>
+            <div class="card-body">Self-check via main LLM<br>NemoGuard 8B Content Safety NIM<br>LlamaGuard · ActiveFence · Cisco AI Defense</div>
+          </div>
+          <div class="card magenta">
+            <div class="card-title">Jailbreak Detection</div>
+            <div class="card-body">Self-check<br>Heuristic pattern detection<br>NemoGuard Jailbreak Detection NIM</div>
+          </div>
+          <div class="card amber">
+            <div class="card-title">Topic Control</div>
+            <div class="card-body">Colang dialog flows — deterministic<br>NemoGuard Topic Control NIM — semantic</div>
+          </div>
+          <div class="card">
+            <div class="card-title">PII Detection</div>
+            <div class="card-body">GLiNER-PII<br>Microsoft Presidio · Private AI<br>Built-in masking flows</div>
+          </div>
+        </div>
+        <p class="footer-note">NIMs are purpose-built small models per task. Faster and more consistent — one extra service to host.</p>
+      </div>
+    </section>
+
+    <!-- Slide 11: End-to-End Example -->
+    <section class="slide" data-title="End-to-End Example" aria-label="Slide 11: End-to-End Example" role="group">
+      <div class="slide-inner">
+        <div class="slide-label">Section 09</div>
+        <h2>End-to-End Example</h2>
+        <p class="lead">A minimal config: redirect a sensitive topic, safety-check every response.</p>
+        <div class="split">
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span>
+              <span class="terminal-title">config/rails/topics.co</span>
+            </div>
+            <div class="terminal-body"><span class="kw">define user</span> ask medical advice
+  <span class="str">"What should I take for a headache?"</span>
+
+<span class="kw">define bot</span> refuse medical advice
+  <span class="str">"I'm not able to give medical advice."</span>
+
+<span class="kw">define flow</span> medical advice
+  user ask medical advice
+  bot refuse medical advice</div>
+          </div>
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot"></span><span class="terminal-dot"></span><span class="terminal-dot"></span>
+              <span class="terminal-title">config/config.yml</span>
+            </div>
+            <div class="terminal-body"><span class="key">models</span>:
+  - <span class="key">type</span>: main
+    <span class="key">engine</span>: openai
+    <span class="key">model</span>: gpt-4o-mini
+
+<span class="key">rails</span>:
+  <span class="key">input</span>:
+    <span class="key">flows</span>: [self check input]
+  <span class="key">output</span>:
+    <span class="key">flows</span>:
+      - self check facts
+      - self check output</div>
+          </div>
+        </div>
+        <p class="footer-note">Medical questions → deterministic redirect. Everything else → grounded and safety-checked before the user sees it.</p>
+      </div>
+    </section>
+
+    <!-- Slide 12: Deploy, Debug, Resources -->
+    <section class="slide" data-title="Deploy, Debug, Resources" aria-label="Slide 12: Deploy Debug Resources" role="group">
+      <div class="slide-inner">
+        <div class="slide-label">Sections 10–13</div>
+        <h2>Deploy, Debug &amp; Resources</h2>
+        <div class="card-grid cols-3">
+          <div class="card">
+            <div class="card-title">Debug</div>
+            <div class="card-body">
+              <div class="terminal" style="margin-bottom:0.5rem;">
+                <div class="terminal-body" style="padding:0.5rem 0.75rem;font-size:0.72rem;"><span class="prompt">$ </span>nemoguardrails chat --verbose</div>
+              </div>
+              Shows every rail and action per turn.<br>
+              Best tool for live "why did it block that?" demos.
+            </div>
+          </div>
+          <div class="card magenta">
+            <div class="card-title">Deploy</div>
+            <div class="card-body">
+              <strong>LIBRARY</strong> — dev, prototyping, small deployments.<br>
+              <strong>MICROSERVICE</strong> — Kubernetes/Helm, same config format.<br>
+              <strong>SERVER MODE</strong> — OpenAI-compatible <code style="font-family:var(--font-mono);font-size:0.8em;">/v1</code> proxy.
+            </div>
+          </div>
+          <div class="card amber">
+            <div class="card-title">Resources</div>
+            <div class="card-body">
+              <a class="resource-link" href="https://docs.nvidia.com/nemo/guardrails" target="_blank" rel="noopener">docs.nvidia.com/nemo/guardrails</a><br>
+              <a class="resource-link" href="https://github.com/NVIDIA-NeMo/Guardrails" target="_blank" rel="noopener">github.com/NVIDIA-NeMo/Guardrails</a><br><br>
+              Guardrails reduce risk. They do not eliminate it.
+            </div>
+          </div>
+        </div>
+        <p class="closing-cta">Questions?</p>
+        <p class="closing-subline">github.com/NVIDIA-NeMo/Guardrails · docs.nvidia.com/nemo/guardrails</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Overview Grid -->
+  <div class="overview" id="overview" role="dialog" aria-label="Slide overview" aria-modal="true">
+    <div class="overview-header">
+      <h2>Slide Overview</h2>
+      <span class="overview-close">Press <kbd style="font-family:var(--font-mono);color:var(--cyan);">.</kbd> or <kbd style="font-family:var(--font-mono);color:var(--cyan);">Esc</kbd> to close</span>
+    </div>
+    <div class="overview-grid" id="overviewGrid"></div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const slides = Array.from(document.querySelectorAll('.slide'));
+      const total = slides.length;
+      const progressBar = document.getElementById('progressBar');
+      const counterCurrent = document.getElementById('counterCurrent');
+      const counterTotal = document.getElementById('counterTotal');
+      const btnPrev = document.getElementById('btnPrev');
+      const btnNext = document.getElementById('btnNext');
+      const overview = document.getElementById('overview');
+      const overviewGrid = document.getElementById('overviewGrid');
+      const liveRegion = document.getElementById('liveRegion');
+
+      counterTotal.textContent = String(total).padStart(2, '0');
+
+      const state = { index: 0, overviewOpen: false };
+
+      // Build overview tiles
+      slides.forEach(function (slide, i) {
+        const tile = document.createElement('button');
+        tile.className = 'overview-tile';
+        tile.setAttribute('aria-label', 'Go to slide ' + (i + 1) + ': ' + slide.dataset.title);
+        tile.innerHTML =
+          '<span class="overview-tile-num">' + String(i + 1).padStart(2, '0') + '</span>' +
+          '<span class="overview-tile-title">' + slide.dataset.title + '</span>';
+        tile.addEventListener('click', function () {
+          closeOverview();
+          goTo(i);
+        });
+        overviewGrid.appendChild(tile);
+      });
+
+      const overviewTiles = Array.from(document.querySelectorAll('.overview-tile'));
+
+      function pad(n) {
+        return String(n).padStart(2, '0');
+      }
+
+      function goTo(i) {
+        if (i < 0 || i >= total) return;
+        slides[state.index].classList.remove('active');
+        state.index = i;
+        slides[state.index].classList.add('active');
+
+        const pct = ((i + 1) / total) * 100;
+        progressBar.style.width = pct + '%';
+        progressBar.setAttribute('aria-valuenow', i + 1);
+        counterCurrent.textContent = pad(i + 1);
+
+        btnPrev.disabled = i === 0;
+        btnNext.disabled = i === total - 1;
+
+        overviewTiles.forEach(function (tile, ti) {
+          tile.classList.toggle('current', ti === i);
+        });
+
+        const title = slides[i].dataset.title;
+        liveRegion.textContent = 'Slide ' + (i + 1) + ' of ' + total + ': ' + title;
+
+        if (history.replaceState) {
+          history.replaceState(null, '', '#' + (i + 1));
+        } else {
+          location.hash = i + 1;
+        }
+      }
+
+      function next() { goTo(state.index + 1); }
+      function prev() { goTo(state.index - 1); }
+
+      function openOverview() {
+        state.overviewOpen = true;
+        overview.classList.add('open');
+        document.body.classList.add('overview-mode');
+        overviewTiles[state.index].focus();
+      }
+
+      function closeOverview() {
+        state.overviewOpen = false;
+        overview.classList.remove('open');
+        document.body.classList.remove('overview-mode');
+      }
+
+      function toggleOverview() {
+        if (state.overviewOpen) closeOverview();
+        else openOverview();
+      }
+
+      // Keyboard navigation
+      document.addEventListener('keydown', function (e) {
+        if (state.overviewOpen) {
+          if (e.key === 'Escape' || e.key === '.') {
+            e.preventDefault();
+            closeOverview();
+          }
+          return;
+        }
+
+        switch (e.key) {
+          case 'ArrowRight':
+          case 'ArrowDown':
+          case 'PageDown':
+            e.preventDefault();
+            next();
+            break;
+          case 'ArrowLeft':
+          case 'ArrowUp':
+          case 'PageUp':
+            e.preventDefault();
+            prev();
+            break;
+          case ' ':
+            e.preventDefault();
+            if (e.shiftKey) prev();
+            else next();
+            break;
+          case 'Home':
+            e.preventDefault();
+            goTo(0);
+            break;
+          case 'End':
+            e.preventDefault();
+            goTo(total - 1);
+            break;
+          case '.':
+            e.preventDefault();
+            toggleOverview();
+            break;
+          case 'Escape':
+            toggleOverview();
+            break;
+        }
+      });
+
+      // Nav buttons
+      btnPrev.addEventListener('click', prev);
+      btnNext.addEventListener('click', next);
+
+      // Swipe / pointer
+      let pointerStartX = 0;
+      let pointerStartY = 0;
+      const SWIPE_THRESHOLD = 40;
+
+      document.addEventListener('pointerdown', function (e) {
+        if (state.overviewOpen) return;
+        pointerStartX = e.clientX;
+        pointerStartY = e.clientY;
+      });
+
+      document.addEventListener('pointerup', function (e) {
+        if (state.overviewOpen) return;
+        const dx = e.clientX - pointerStartX;
+        const dy = e.clientY - pointerStartY;
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > SWIPE_THRESHOLD) {
+          if (dx < 0) next();
+          else prev();
+        }
+      });
+
+      // Hash deep-link on load
+      function initFromHash() {
+        const hash = location.hash.replace('#', '');
+        const num = parseInt(hash, 10);
+        if (!isNaN(num) && num >= 1 && num <= total) {
+          goTo(num - 1);
+        } else {
+          goTo(0);
+        }
+      }
+
+      window.addEventListener('hashchange', function () {
+        const hash = location.hash.replace('#', '');
+        const num = parseInt(hash, 10);
+        if (!isNaN(num) && num >= 1 && num <= total && num - 1 !== state.index) {
+          goTo(num - 1);
+        }
+      });
+
+      initFromHash();
+    })();
+  </script>
+</body>
+</html>

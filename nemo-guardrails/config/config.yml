@@ -1,0 +1,27 @@
+models:
+  - type: main
+    engine: openai
+    model: qwen2.5-coder-7b
+    parameters:
+      base_url: http://localhost:1234/v1
+      api_key: lm-studio
+  - type: self_check_input
+    engine: openai
+    model: qwen2.5-coder-7b
+    parameters:
+      base_url: http://localhost:1234/v1
+      api_key: lm-studio
+  - type: self_check_output
+    engine: openai
+    model: qwen2.5-coder-7b
+    parameters:
+      base_url: http://localhost:1234/v1
+      api_key: lm-studio
+
+rails:
+  input:
+    flows:
+      - self check input
+  output:
+    flows:
+      - self check output

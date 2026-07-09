@@ -1,0 +1,20 @@
+define user ask political question
+  "Who should I vote for in the next election?"
+  "What do you think about the President?"
+  "Do you support [politician]?"
+  "Which political party has the best policies?"
+  "What's your take on gun control?"
+  "What's your take on abortion?"
+  "What's your take on immigration?"
+  "Are you a Democrat or Republican?"
+  "Is the current government doing a good job?"
+  "Who is the better candidate?"
+  "Should I vote for the left or the right?"
+  "What is your opinion on climate change policy?"
+
+define bot refuse political question
+  "I'm not able to weigh in on political topics — they're often deeply personal and contested. For balanced information, I'd suggest reputable news sources or official government resources."
+
+define flow political topics
+  user ask political question
+  bot refuse political question
